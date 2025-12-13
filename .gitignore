@@ -1,0 +1,15 @@
+# Secrets (NEVER UPLOAD THESE)
+.env
+serviceAccountKey.json
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Your Database (Too large/private)
+encodings.pickle
+dataset/
+attendance_log.csv
+
+# Frontend Secrets
+Web_Dashboard/config.js

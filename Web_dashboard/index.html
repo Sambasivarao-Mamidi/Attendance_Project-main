@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Attendance Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <!-- Sidebar / Top Control Bar -->
+        <div class="control-panel">
+            <div class="brand">
+                <i class="fa-solid fa-flask"></i>
+                <h2>Smart Lab</h2>
+            </div>
+
+            <!-- Teacher Controls -->
+            <div class="filters">
+                <div class="input-group">
+                    <label>Select Lab Subject</label>
+                    <select id="labSelector">
+                        <option value="DBMS Lab">DBMS Lab</option>
+                        <option value="Python Lab">Python Lab</option>
+                        <option value="Java Lab">Java Lab</option>
+                        <option value="OS Lab">OS Lab</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Date</label>
+                    <input type="date" id="dateSelector">
+                </div>
+
+                <button onclick="window.print()" class="btn-print">
+                    <i class="fa-solid fa-print"></i> Print / PDF
+                </button>
+                
+                <button id="exportBtn" class="btn-export">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-area">
+            
+            <!-- Analytics Cards -->
+            <div class="stats-grid">
+                <div class="card total">
+                    <div class="card-icon"><i class="fa-solid fa-users"></i></div>
+                    <div class="card-info">
+                        <h3>Total Present</h3>
+                        <h1 id="totalCount">0</h1>
+                    </div>
+                </div>
+                <div class="card sec-a">
+                    <div class="card-icon"><i class="fa-solid fa-a"></i></div>
+                    <div class="card-info">
+                        <h3>Section A</h3>
+                        <h1 id="countA">0</h1>
+                    </div>
+                </div>
+                <div class="card sec-b">
+                    <div class="card-icon"><i class="fa-solid fa-b"></i></div>
+                    <div class="card-info">
+                        <h3>Section B</h3>
+                        <h1 id="countB">0</h1>
+                    </div>
+                </div>
+            </div>
+
+            <!-- The Table -->
+            <div class="table-wrapper">
+                <h3>Live Log</h3>
+                <input type="text" id="searchBox" placeholder="Search by Name or Roll No..." class="search-bar">
+                
+                <table id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Year</th>
+                            <th>Section</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceBody">
+                        <!-- JS will inject rows here -->
+                    </tbody>
+                </table>
+                <div id="emptyState" class="empty-msg">Waiting for students to enter...</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
