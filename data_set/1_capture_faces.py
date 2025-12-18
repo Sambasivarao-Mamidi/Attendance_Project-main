@@ -3,7 +3,6 @@ import os
 import face_recognition
 import pickle
 import numpy as np
-import re # For checking name format
 
 # --- CONFIGURATION ---
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,17 +35,14 @@ while True:
 while True:
     roll_no = input("Enter Roll No (e.g., 22NR1A0462): ").strip().upper()
     
-    # Rule 1: Must be exactly 10 characters
     if len(roll_no) != 10:
         print(f"❌ Invalid Length. Roll No must be exactly 10 characters (You entered {len(roll_no)}).")
         continue
         
-    # Rule 2: Must be alphanumeric (letters + numbers)
     if not roll_no.isalnum():
         print("❌ Invalid Format. Roll No should only contain Letters and Numbers.")
         continue
         
-    # Rule 3: Must contain at least one digit (Prevents typing Name here)
     if not any(char.isdigit() for char in roll_no):
         print("❌ Error: Roll No must contain numbers. Did you type a Name by mistake?")
         continue
@@ -55,20 +51,16 @@ while True:
 
 # 4. Name Validation (Letters only, no numbers)
 while True:
-    # Changed .title() to .upper() for consistent casing
     name = input("Enter Name: ").strip().upper() 
     
-    # Rule 1: Check length
     if len(name) < 3:
         print("❌ Name too short.")
         continue
         
-    # Rule 2: No numbers allowed in name
     if any(char.isdigit() for char in name):
         print("❌ Error: Name cannot contain numbers. Did you type Roll No by mistake?")
         continue
         
-    # Rule 3: Allow alphabets and spaces only
     if not all(x.isalpha() or x.isspace() for x in name):
         print("❌ Error: Name should only contain letters.")
         continue
@@ -89,7 +81,6 @@ for folder in os.listdir(DATASET_DIR):
         try:
             parts = folder.split("_")
             if len(parts) >= 4:
-                # Check if Roll No matches but Folder Name is different
                 if parts[2] == roll_no and folder != folder_name:
                     conflict = True
                     existing_owner = folder
@@ -109,12 +100,18 @@ if os.path.exists(ENCODINGS_FILE):
     try:
         data = pickle.loads(open(ENCODINGS_FILE, "rb").read())
         cam = cv2.VideoCapture(0)
+        
+        # --- WINDOW SETUP FOR SECURITY SCAN ---
+        scan_window = "Security Scan"
+        cv2.namedWindow(scan_window, cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(scan_window, cv2.WND_PROP_TOPMOST, 1)
+
         if cam.isOpened():
             ret, frame = cam.read()
             cam.release()
+            cv2.destroyWindow(scan_window)
             
             if ret:
-                # Resize for speed
                 small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
                 rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
                 boxes = face_recognition.face_locations(rgb)
@@ -125,7 +122,6 @@ if os.path.exists(ENCODINGS_FILE):
                     
                     if len(dists) > 0:
                         min_dist = np.min(dists)
-                        # Strict check: If face similarity < 0.4, it's the same person
                         if min_dist < 0.4:
                             match_idx = np.argmin(dists)
                             existing_person = data["names"][match_idx]
@@ -156,6 +152,11 @@ count = 0
 
 print("[INFO] Capturing 20 images... Please move your head slightly.")
 
+# --- WINDOW SETUP FOR REGISTRATION ---
+window_name = 'Registering Student'
+cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
+
 while True:
     ret, frame = cam.read()
     if not ret: break
@@ -168,7 +169,7 @@ while True:
         cv2.imwrite(f"{student_path}/{name}_{count}.jpg", frame[y:y+h, x:x+w])
         cv2.putText(frame, f"Captured: {count}/20", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-    cv2.imshow('Registering Student', frame)
+    cv2.imshow(window_name, frame)
     if count >= 20 or cv2.waitKey(1) == ord('q'):
         break
 
