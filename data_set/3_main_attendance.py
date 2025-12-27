@@ -9,12 +9,15 @@ import firebase_admin
 from firebase_admin import credentials, db
 from dotenv import load_dotenv
 from scipy.spatial import distance as dist
+from threading import Thread
+from queue import Queue
 
 # --- CONFIGURATION FOR RASPBERRY PI 4 ---
 EYE_AR_THRESH = 0.25
 EYE_AR_CONSEC_FRAMES = 1
 ENABLE_LIVENESS = True
 SESSION_DURATION_MINUTES = 15
+COOLDOWN_SECONDS = 60
 
 # [PI OPTIMIZATION 1] Set to 3. 
 # 2 is too laggy for Pi, 5 misses blinks. 3 is the sweet spot.
@@ -49,6 +52,32 @@ if key_path:
         ref_attendance = None
 else:
     print("[WARNING] serviceAccountKey.json not found. Firebase disabled.")
+
+# --- BACKGROUND CLOUD SYNC QUEUE & THREAD ---
+cloud_sync_queue = Queue(maxsize=100)
+
+def cloud_sync_worker():
+    """Background thread worker for non-blocking Firebase uploads"""
+    while True:
+        try:
+            upload_data = cloud_sync_queue.get()
+            if upload_data is None:  # Poison pill to stop thread
+                break
+            
+            if ref_attendance:
+                try:
+                    ref_attendance.push(upload_data)
+                    print(f"[FIREBASE] Uploaded: {upload_data['name']}")
+                except Exception as e:
+                    print(f"[ERROR] Cloud sync failed: {e}")
+            
+            cloud_sync_queue.task_done()
+        except Exception as e:
+            print(f"[ERROR] Cloud sync worker error: {e}")
+
+# Start background cloud sync thread
+cloud_sync_thread = Thread(target=cloud_sync_worker, daemon=True)
+cloud_sync_thread.start()
 
 # --- LOAD DATA ---
 if not enc_path: exit("[ERROR] Encodings missing.")
@@ -99,6 +128,7 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 768)
 marked_students = {}
 blink_counters = {}
 verified_real = {}
+last_attendance_time = {}
 
 face_locations = []
 face_names = []
@@ -134,7 +164,8 @@ while True:
         
         rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         
-        face_locations = face_recognition.face_locations(rgb)
+        # Use HOG model for Pi compatibility (much faster than CNN)
+        face_locations = face_recognition.face_locations(rgb, model="hog")
         encs = face_recognition.face_encodings(rgb, face_locations)
         
         landmarks = []
@@ -184,20 +215,29 @@ while True:
                 t_str = now.strftime("%H:%M:%S")
                 d_str = now.strftime("%Y-%m-%d")
                 
+                # --- COOLDOWN MECHANISM (DEBOUNCING) ---
+                if name in last_attendance_time:
+                    time_since_last = (now - last_attendance_time[name]).total_seconds()
+                    if time_since_last < COOLDOWN_SECONDS:
+                        print(f"[SKIP] {name} already marked {time_since_last:.1f}s ago (cooldown: {COOLDOWN_SECONDS}s)")
+                        continue
+                
+                # Mark attendance
                 print(f"[MARKED] {name}")
+                last_attendance_time[name] = now
                 
                 with open(log_file, "a") as f:
                     f.write(f"{name},{roll},{yr},{sec},{t_str},{d_str},Present\n")
                 
-                if ref_attendance:
-                    try:
-                        ref_attendance.push({
-                            'name': name, 'roll_no': roll, 'year': yr, 
-                            'section': sec, 'time': t_str, 'date': d_str
-                        })
-                        print(f"[FIREBASE] Uploaded attendance for {name}")
-                    except Exception as e:
-                        print(f"[ERROR] Firebase upload failed: {e}")
+                # Non-blocking: Queue the upload instead of waiting for it
+                upload_data = {
+                    'name': name, 'roll_no': roll, 'year': yr, 
+                    'section': sec, 'time': t_str, 'date': d_str
+                }
+                try:
+                    cloud_sync_queue.put_nowait(upload_data)
+                except Exception as e:
+                    print(f"[WARNING] Upload queue full, skipping: {e}")
 
     # --- DRAWING ---
     for (top, right, bottom, left), name, is_real in zip(face_locations, face_names, face_real_status):
@@ -231,3 +271,9 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+
+# Graceful shutdown: Stop the background sync thread
+print("[INFO] Stopping background sync thread...")
+cloud_sync_queue.put(None)  # Send poison pill
+cloud_sync_thread.join(timeout=5)  # Wait up to 5 seconds
+print("[INFO] Shutdown complete.")
