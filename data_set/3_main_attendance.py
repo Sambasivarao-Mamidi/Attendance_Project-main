@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from scipy.spatial import distance as dist
 from threading import Thread
 from queue import Queue
-
+qeaqq
 # --- CONFIGURATION FOR RASPBERRY PI 4 ---
 EYE_AR_THRESH = 0.25
 EYE_AR_CONSEC_FRAMES = 1
