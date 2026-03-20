@@ -1,15 +1,43 @@
-# Secrets (NEVER UPLOAD THESE)
+# ===== Secrets (NEVER UPLOAD) =====
 .env
+data_set/.env
 serviceAccountKey.json
+data_set/serviceAccountKey.json
 
-# Python Cache
+# ===== Student Dataset (Private/Large) =====
+data_set/dataset/
+data_set/encodings.pickle
+data_set/attendance_log.csv
+data_set/students_db.csv
+
+# ===== Python =====
+.venv/
+venv/
+env/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
 
-# Your Database (Too large/private)
-encodings.pickle
-dataset/
-attendance_log.csv
+# ===== Node Modules =====
+node_modules/
+dashboard/node_modules/
 
-# Frontend Secrets
+# ===== IDE / Editor =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== OS Files =====
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ===== Frontend Secrets =====
 Web_Dashboard/config.js

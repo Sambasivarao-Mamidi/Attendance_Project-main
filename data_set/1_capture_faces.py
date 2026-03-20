@@ -3,11 +3,14 @@ import os
 import face_recognition
 import pickle
 import numpy as np
+import csv
+import time  # Added for capture delay
 
 # --- CONFIGURATION ---
 script_dir = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(script_dir, "dataset")
 ENCODINGS_FILE = os.path.join(script_dir, "encodings.pickle")
+STUDENTS_DB = os.path.join(script_dir, "students_db.csv")
 
 if not os.path.exists(DATASET_DIR):
     os.makedirs(DATASET_DIR)
@@ -145,10 +148,11 @@ if not os.path.exists(student_path):
 else:
     print(f"\n[INFO] Student exists. Adding more training photos.")
 
-# 8. Start Camera
+# 8. --- IMPROVED CAMERA CAPTURE ---
 cam = cv2.VideoCapture(0)
 detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 count = 0
+last_capture_time = 0
 
 print("[INFO] Capturing 20 images... Please move your head slightly.")
 
@@ -160,19 +164,67 @@ cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
 while True:
     ret, frame = cam.read()
     if not ret: break
+    
+    # Create a copy for displaying the green box
+    display_frame = frame.copy()
+    
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = detector.detectMultiScale(gray, 1.3, 5)
+    
+    # Strict face detection to avoid background noise
+    faces = detector.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=7, minSize=(100, 100))
 
     for (x, y, w, h) in faces:
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-        count += 1
-        cv2.imwrite(f"{student_path}/{name}_{count}.jpg", frame[y:y+h, x:x+w])
-        cv2.putText(frame, f"Captured: {count}/20", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        # Draw rectangle only on the display frame
+        cv2.rectangle(display_frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        
+        current_time = time.time()
+        
+        # 0.3-second delay between captures
+        if current_time - last_capture_time > 0.3:
+            count += 1
+            # Save the FULL, clean frame without the green box drawn on it
+            cv2.imwrite(os.path.join(student_path, f"{name}_{count}.jpg"), frame)
+            last_capture_time = current_time
+            
+        cv2.putText(display_frame, f"Captured: {count}/20", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        break  # Process only one face to avoid capturing multiple people at once
 
-    cv2.imshow(window_name, frame)
+    cv2.imshow(window_name, display_frame)
     if count >= 20 or cv2.waitKey(1) == ord('q'):
         break
 
 cam.release()
 cv2.destroyAllWindows()
 print(f"[SUCCESS] Registration Completed for {name} (Roll: {roll_no})")
+
+# 9. --- AUTO-SAVE TO STUDENTS DATABASE ---
+print(f"\n[INFO] Adding student to database...")
+try:
+    student_exists = False
+    if os.path.exists(STUDENTS_DB):
+        with open(STUDENTS_DB, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            # Handle empty CSVs without headers properly
+            if reader.fieldnames:
+                for row in reader:
+                    if row.get('RollNo', '').strip() == roll_no:
+                        student_exists = True
+                        print(f"[INFO] Student {roll_no} already in database. Skipping...")
+                        break
+    
+    if not student_exists:
+        # If file doesn't exist, we should write headers first
+        write_headers = not os.path.exists(STUDENTS_DB)
+        with open(STUDENTS_DB, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            if write_headers:
+                writer.writerow(['RollNo', 'Name', 'Section'])
+            writer.writerow([roll_no, name, section])
+            
+        print(f"✅ [SUCCESS] Student added to database:")
+        print(f"   RollNo: {roll_no}")
+        print(f"   Name: {name}")
+        print(f"   Section: {section}")
+    
+except Exception as e:
+    print(f"❌ [ERROR] Failed to save to database: {e}")

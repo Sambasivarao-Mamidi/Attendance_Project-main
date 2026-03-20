@@ -1,61 +1,56 @@
-import cv2
 import face_recognition
 import pickle
 import os
+import cv2
+import numpy as np
+from PIL import Image  # Added for strict standardization
 
-# --- ROBUST PATH CONFIGURATION ---
+# --- PATH CONFIGURATION ---
 script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
+DATASET_DIR = os.path.join(script_dir, "dataset")
 
-# Search for 'dataset' folder
-possible_dataset_paths = [
-    os.path.join(script_dir, "dataset"),
-    os.path.join(parent_dir, "dataset"),
-    os.path.join(script_dir, "../dataset")
-]
-
-DATASET_DIR = None
-for path in possible_dataset_paths:
-    if os.path.exists(path):
-        DATASET_DIR = path
-        break
-
-if DATASET_DIR is None:
-    print(f"[ERROR] Could not find 'dataset' folder.")
-    print(f"Checked locations: {possible_dataset_paths}")
+if not os.path.exists(DATASET_DIR):
+    print(f"[ERROR] Could not find 'dataset' folder at {DATASET_DIR}")
     exit()
 
-# Set encodings file path (Next to this script)
 ENCODINGS_FILE = os.path.join(script_dir, "encodings.pickle")
-
 known_encodings = []
 known_names = []
 
-print(f"[INFO] Found dataset at: {DATASET_DIR}")
-print("[INFO] Quantifying faces...")
+print(f"[INFO] Processing images...")
 
-# Loop over the dataset
 for root, dirs, files in os.walk(DATASET_DIR):
     for file in files:
-        if file.endswith("jpg") or file.endswith("png"):
+        if file.lower().endswith((".jpg", ".png", ".jpeg")):
             path = os.path.join(root, file)
-            name = os.path.basename(root) # Extracts "2_A_501_Name"
+            name = os.path.basename(root)
 
-            image = cv2.imread(path)
-            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            try:
+                # STEP 1: Open with PIL and force convert to RGB
+                # This fixes the "8bit" error by stripping hidden profiles
+                pil_image = Image.open(path).convert('RGB')
+                
+                # STEP 2: Convert to a format face_recognition understands
+                image_array = np.array(pil_image)
+                
+                # STEP 3: Detect and Encode
+                face_locations = face_recognition.face_locations(image_array, model="hog")
+                
+                if len(face_locations) > 0:
+                    face_encodings = face_recognition.face_encodings(image_array, face_locations)
+                    for encoding in face_encodings:
+                        known_encodings.append(encoding)
+                        known_names.append(name)
+                    print(f"[OK] {name}/{file}")
+                else:
+                    print(f"[SKIP] No face found in: {file}")
 
-            boxes = face_recognition.face_locations(rgb, model="hog")
-            encodings = face_recognition.face_encodings(rgb, boxes)
+            except Exception as e:
+                print(f"[ERROR] Failed on {file}: {e}")
 
-            for encoding in encodings:
-                known_encodings.append(encoding)
-                known_names.append(name)
-
-print("[INFO] Serializing encodings...")
+print("\n[INFO] Saving encodings...")
 data = {"encodings": known_encodings, "names": known_names}
-
 with open(ENCODINGS_FILE, "wb") as f:
     f.write(pickle.dumps(data))
 
-print(f"[SUCCESS] Training complete. Saved to: {ENCODINGS_FILE}")
-print(f"[INFO] Total unique students trained: {len(set(known_names))}")
+print(f"[SUCCESS] Total unique students: {len(set(known_names))}")
