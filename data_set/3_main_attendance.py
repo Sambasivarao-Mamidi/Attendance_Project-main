@@ -11,17 +11,23 @@ from dotenv import load_dotenv
 from scipy.spatial import distance as dist
 from threading import Thread
 from queue import Queue
-qeaqq
 # --- CONFIGURATION FOR RASPBERRY PI 4 ---
-EYE_AR_THRESH = 0.25
-EYE_AR_CONSEC_FRAMES = 1
+# EAR (Eye Aspect Ratio) for Liveness Detection (Blink Detection)
+# Standard range: 0.20 - 0.30. Adjust based on camera quality and lighting.
+# Typical Open Eye: 0.30 - 0.40
+# Typical Closed Eye: 0.15 - 0.20
+EYE_AR_THRESH = 0.25  # Threshold below which eye is considered closed
+EYE_AR_CONSEC_FRAMES = 1  # FAST: Detect blink on 1st closed frame (adjust to 2 if false positives occur)
 ENABLE_LIVENESS = True
+DEBUG_EAR = False  # Set to True to print EAR values for calibration
 SESSION_DURATION_MINUTES = 15
 COOLDOWN_SECONDS = 60
 
-# [PI OPTIMIZATION 1] Set to 3. 
-# 2 is too laggy for Pi, 5 misses blinks. 3 is the sweet spot.
-PROCESS_EVERY_N_FRAMES = 3  
+# [PI OPTIMIZATION 1] Set to 2 for FASTER detection
+# 1 = processes every frame (very responsive but CPU heavy)
+# 2 = processes every 2 frames (recommended for speed + Pi compatibility)
+# 3 = processes every 3 frames (most Pi-friendly, slowest detection)
+PROCESS_EVERY_N_FRAMES = 2  
 
 # --- PATH SETUP ---
 load_dotenv()
@@ -40,18 +46,24 @@ log_file = os.path.join(script_dir, "attendance_log.csv")
 # --- FIREBASE INIT ---
 ref_attendance = None
 ref_students = None
-if key_path:
-    try:
-        cred = credentials.Certificate(key_path)
-        firebase_admin.initialize_app(cred, {'databaseURL': os.getenv("FIREBASE_URL")})
-        ref_attendance = db.reference('attendance')
-        ref_students = db.reference('students')
-        print("[INFO] Firebase Connected!")
-    except Exception as e:
-        print(f"[ERROR] Firebase Connection Failed: {e}")
-        ref_attendance = None
-else:
-    print("[WARNING] serviceAccountKey.json not found. Firebase disabled.")
+def init_firebase():
+    global ref_attendance, ref_students
+    if key_path:
+        try:
+            cred = credentials.Certificate(key_path)
+            firebase_admin.initialize_app(cred, {'databaseURL': os.getenv("FIREBASE_URL")})
+            ref_attendance = db.reference('attendance')
+            ref_students = db.reference('students')
+            print("[INFO] Firebase Connected!")
+        except Exception as e:
+            print(f"[ERROR] Firebase Connection Failed: {e}")
+            ref_attendance = None
+    else:
+        print("[WARNING] serviceAccountKey.json not found. Firebase disabled.")
+
+# Initialize Firebase in background (non-blocking)
+firebase_thread = Thread(target=init_firebase, daemon=True)
+firebase_thread.start()
 
 # --- BACKGROUND CLOUD SYNC QUEUE & THREAD ---
 cloud_sync_queue = Queue(maxsize=100)
@@ -89,7 +101,7 @@ if not os.path.exists(log_file):
 # --- SYNC ROSTER TO CLOUD ---
 def sync_roster():
     if not ref_students: return
-    print("[INFO] Syncing Class Roster to Cloud...")
+    print("[INFO] Syncing Class Roster to Cloud (Background)...")
     unique_students = set(data["names"])
     
     for full_info in unique_students:
@@ -108,14 +120,35 @@ def sync_roster():
             print(f"[ERROR] Sync failed for {full_info}: {e}")
     print("[INFO] Roster Synced Successfully.")
 
-sync_roster()
+# Run roster sync in background thread (non-blocking)
+roster_sync_thread = Thread(target=sync_roster, daemon=True)
+roster_sync_thread.start()
 
-# --- HELPER: EAR ---
+# --- HELPER: EAR (Eye Aspect Ratio) ---
+# Computes the eye aspect ratio from 6 landmarks around the eye
+# Formula: EAR = (||p2 - p6|| + ||p3 - p5||) / (2 * ||p1 - p4||)
+# Where p1-p6 are the 6 points around the eye (top, top-right, bottom-right, bottom, bottom-left, top-left)
 def get_ear(eye):
-    A = dist.euclidean(eye[1], eye[5])
-    B = dist.euclidean(eye[2], eye[4])
-    C = dist.euclidean(eye[0], eye[3])
+    """Calculate Eye Aspect Ratio from eye landmarks"""
+    A = dist.euclidean(eye[1], eye[5])  # Vertical distance top-right
+    B = dist.euclidean(eye[2], eye[4])  # Vertical distance bottom-right
+    C = dist.euclidean(eye[0], eye[3])  # Horizontal distance
     return (A + B) / (2.0 * C)
+
+def calibrate_ear_threshold():
+    """
+    Calibration helper: Run the camera and observe EAR values.
+    Adjust EYE_AR_THRESH based on these observations:
+    - Sit normally: EAR should be around 0.30+
+    - Blink: EAR should drop to 0.18
+    - If detects blinks when eyes open: lower threshold (try 0.22)
+    - If never detects blinks: raise threshold (try 0.28)
+    """
+    print(f"[CALIBRATION] Current EAR Threshold: {EYE_AR_THRESH}")
+    print(f"[CALIBRATION] Consecutive Frames Required: {EYE_AR_CONSEC_FRAMES}")
+    print("[CALIBRATION] Watch the terminal for EAR values below.")
+    print("[CALIBRATION] Sit normally (eyes open) - EAR should be 0.30+")
+    print("[CALIBRATION] Blink - EAR should drop to 0.18")
 
 # --- MAIN LOOP ---
 cap = cv2.VideoCapture(0)
@@ -137,7 +170,12 @@ face_real_status = []
 frame_count = 0  
 session_end = datetime.now() + timedelta(minutes=SESSION_DURATION_MINUTES)
 
-print("[INFO] Camera Started. IMPORTANT: Click the Video Window before pressing 'q' to quit.")
+print("\n" + "="*60)
+print("[INFO] ✓ Attendance System READY!")
+print("[INFO] Loading: Face encodings loaded, Camera initialized")
+print("[INFO] Background: Firebase & Roster sync running in background")
+print("[INFO] Press 'q' to quit | 'e' to extend session")
+print("="*60 + "\n")
 
 # --- WINDOW SETUP ---
 window_name = "Attendance System"
@@ -185,12 +223,17 @@ while True:
 
             face_names.append(name)
 
-            # LIVENESS CHECK
+            # LIVENESS CHECK - Blink Detection for Photo Spoofing Prevention
             is_real = False
             if ENABLE_LIVENESS and name != "Unknown":
                 if i < len(landmarks):
                     lm = landmarks[i]
-                    ear = (get_ear(lm["left_eye"]) + get_ear(lm["right_eye"])) / 2.0
+                    left_ear = get_ear(lm["left_eye"])
+                    right_ear = get_ear(lm["right_eye"])
+                    ear = (left_ear + right_ear) / 2.0
+                    
+                    if DEBUG_EAR:
+                        print(f"[EAR] {name}: L={left_ear:.3f}, R={right_ear:.3f}, Avg={ear:.3f}, Threshold={EYE_AR_THRESH}")
                     
                     if name not in blink_counters: blink_counters[name] = 0
                     if name not in verified_real: verified_real[name] = False
