@@ -6,6 +6,7 @@ import os
 import time
 import threading
 import csv
+import psutil
 from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, db
@@ -298,6 +299,66 @@ last_lcd_message_time = time.time()  # Debounce LCD updates
 LCD_MESSAGE_HOLD_TIME = 2.0  # Minimum seconds to display a message before reset
 
 lcd_display("SYSTEM READY", "Show your face")
+
+# --- HARDWARE TELEMETRY (Push Pi vitals to Firebase) ---
+def get_cpu_temp():
+    """Read the Pi's internal CPU temperature from the thermal sensor."""
+    try:
+        with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+            temp = float(f.read()) / 1000.0
+        return round(temp, 1)
+    except Exception:
+        # Fallback for non-Pi systems (Windows/Mac) — use psutil if available
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for name, entries in temps.items():
+                    if entries:
+                        return round(entries[0].current, 1)
+        except Exception:
+            pass
+        return 0.0
+
+def push_telemetry():
+    """Continuously push hardware stats to Firebase every 3 seconds."""
+    startup_time = time.time()
+    while True:
+        try:
+            cpu_usage = psutil.cpu_percent(interval=1)
+            ram = psutil.virtual_memory()
+            ram_pct = ram.percent
+            ram_used = round(ram.used / (1024 ** 3), 2)  # GB
+            ram_total = round(ram.total / (1024 ** 3), 2)  # GB
+            temp = get_cpu_temp()
+
+            # Calculate uptime
+            uptime_secs = int(time.time() - startup_time)
+            days = uptime_secs // 86400
+            hours = (uptime_secs % 86400) // 3600
+            mins = (uptime_secs % 3600) // 60
+            uptime_str = f"{days}d {hours}h {mins}m"
+
+            # Push to Firebase
+            db.reference('SystemHealth/Pi4').set({
+                'cpu_temp': temp,
+                'cpu_usage': cpu_usage,
+                'ram_usage': ram_pct,
+                'ram_used_gb': ram_used,
+                'ram_total_gb': ram_total,
+                'uptime': uptime_str,
+                'status': 'Online',
+                'timestamp': int(time.time())
+            })
+
+            time.sleep(3)
+        except Exception as e:
+            print(f"[TELEMETRY] Error: {e}")
+            time.sleep(5)
+
+# Start telemetry in background (daemon thread — won't block camera)
+telemetry_thread = threading.Thread(target=push_telemetry, daemon=True)
+telemetry_thread.start()
+print("[INFO] Hardware telemetry thread started")
 
 while True:
     ret, frame = cap.read()

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { database, ref, onValue } from './firebase'
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid
 } from 'recharts'
@@ -18,13 +19,53 @@ function generateCpuPoint(prev) {
 
 export default function HardwareTelemetry({ theme }) {
   const [cpuData, setCpuData] = useState([])
-  const [modal, setModal] = useState(null)   // 'reboot' | 'restart-cam' | null
-  const [confirmed, setConfirmed] = useState(null) // tracks which action was confirmed
+  const [modal, setModal] = useState(null)
+  const [confirmed, setConfirmed] = useState(null)
   const lastVal = useRef(35)
 
-  // Simulated live CPU data
+  // Live Firebase telemetry
+  const [telemetry, setTelemetry] = useState({
+    cpu_temp: 0,
+    cpu_usage: 0,
+    ram_usage: 0,
+    ram_used_gb: 0,
+    ram_total_gb: 0,
+    uptime: '—',
+    status: 'Offline',
+    timestamp: 0
+  })
+  const [firebaseConnected, setFirebaseConnected] = useState(false)
+
+  // Listen to SystemHealth/Pi4 in Firebase
   useEffect(() => {
-    // Initialize
+    const healthRef = ref(database, 'SystemHealth/Pi4')
+    const unsubscribe = onValue(healthRef, (snapshot) => {
+      const data = snapshot.val()
+      if (data) {
+        setTelemetry({
+          cpu_temp: data.cpu_temp || 0,
+          cpu_usage: data.cpu_usage || 0,
+          ram_usage: data.ram_usage || 0,
+          ram_used_gb: data.ram_used_gb || 0,
+          ram_total_gb: data.ram_total_gb || 0,
+          uptime: data.uptime || '—',
+          status: data.status || 'Offline',
+          timestamp: data.timestamp || 0
+        })
+        setFirebaseConnected(true)
+      }
+    }, () => {
+      setFirebaseConnected(false)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Check if data is stale (> 15 seconds old = probably offline)
+  const isOnline = firebaseConnected && telemetry.status === 'Online' &&
+    (Date.now() / 1000 - telemetry.timestamp) < 15
+
+  // Use real CPU usage from Firebase if live, otherwise simulate
+  useEffect(() => {
     const init = []
     for (let i = 0; i < MAX_POINTS; i++) {
       const v = generateCpuPoint(lastVal.current)
@@ -34,23 +75,26 @@ export default function HardwareTelemetry({ theme }) {
     setCpuData(init)
 
     const interval = setInterval(() => {
-      const v = generateCpuPoint(lastVal.current)
+      // If Pi is online, use real cpu_usage; otherwise simulate
+      const v = isOnline
+        ? telemetry.cpu_usage + (Math.random() - 0.5) * 3 // add slight jitter to real data for smooth chart
+        : generateCpuPoint(lastVal.current)
       lastVal.current = v
       setCpuData(prev => {
-        const next = [...prev.slice(1), { t: prev[prev.length - 1].t + 1, cpu: Math.round(v * 10) / 10 }]
+        const next = [...prev.slice(1), { t: prev[prev.length - 1].t + 1, cpu: Math.round(Math.max(0, Math.min(100, v)) * 10) / 10 }]
         return next
       })
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Simulated telemetry values
-  const cpuTemp = 58
-  const ramUsed = 2.6
-  const ramTotal = 4.0
-  const ramPct = Math.round((ramUsed / ramTotal) * 100)
-  const uptime = '4d 12h 30m'
+  // Derive display values: prefer Firebase data when available
+  const cpuTemp = isOnline ? telemetry.cpu_temp : 58
+  const ramPct = isOnline ? Math.round(telemetry.ram_usage) : 65
+  const ramUsed = isOnline ? telemetry.ram_used_gb : 2.6
+  const ramTotal = isOnline ? telemetry.ram_total_gb : 4.0
+  const uptime = isOnline ? telemetry.uptime : '—'
   const cameraModel = 'Logitech C270'
 
   const tempColor = cpuTemp > 75 ? 'var(--rose)' : cpuTemp > 60 ? 'var(--amber)' : 'var(--emerald)'
@@ -73,10 +117,12 @@ export default function HardwareTelemetry({ theme }) {
         <div className="telemetry-title">
           <Cpu size={15} />
           <span>Edge Device Telemetry (Pi 4)</span>
+          {!isOnline && <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginLeft: '6px' }}>(Simulated)</span>}
         </div>
-        <div className="telemetry-status connected">
-          <div className="telemetry-dot" />
-          Connected
+        <div className={`telemetry-status ${isOnline ? 'connected' : ''}`}
+          style={!isOnline ? { background: 'var(--amber-bg)', color: 'var(--amber)' } : {}}>
+          <div className="telemetry-dot" style={!isOnline ? { background: 'var(--amber)' } : {}} />
+          {isOnline ? 'Connected' : 'Standby'}
         </div>
       </div>
 
@@ -106,11 +152,11 @@ export default function HardwareTelemetry({ theme }) {
         </div>
 
         <div className="tele-stat">
-          <div className="tele-stat-icon" style={{ color: 'var(--emerald)' }}>
+          <div className="tele-stat-icon" style={{ color: isOnline ? 'var(--emerald)' : 'var(--text-tertiary)' }}>
             <Camera size={16} />
           </div>
           <div className="tele-stat-info">
-            <div className="tele-stat-value" style={{ fontSize: '13px' }}>Active</div>
+            <div className="tele-stat-value" style={{ fontSize: '13px' }}>{isOnline ? 'Active' : 'Idle'}</div>
             <div className="tele-stat-label">{cameraModel}</div>
           </div>
         </div>
@@ -129,8 +175,8 @@ export default function HardwareTelemetry({ theme }) {
       {/* Live CPU Chart */}
       <div className="telemetry-chart">
         <div className="telemetry-chart-label">
-          <span>Live CPU Load</span>
-          <span className="telemetry-chart-live">● LIVE</span>
+          <span>Live CPU Load {isOnline ? '' : '(Simulated)'}</span>
+          <span className="telemetry-chart-live">{isOnline ? '● LIVE' : '○ SIM'}</span>
         </div>
         <div style={{ height: 160 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -153,7 +199,7 @@ export default function HardwareTelemetry({ theme }) {
               <Line
                 type="monotone"
                 dataKey="cpu"
-                stroke="#6366f1"
+                stroke={isOnline ? '#10b981' : '#6366f1'}
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
