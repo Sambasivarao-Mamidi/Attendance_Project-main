@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { database, ref, onValue } from './firebase'
+import { Sun, Moon, Download, RefreshCw, Eye } from 'lucide-react'
+import StudentProfile from './StudentProfile'
 import './App.css'
 
-// Cooldown period in milliseconds (1.5 hours = 90 minutes)
 const COOLDOWN_MS = 90 * 60 * 1000
 
 function App() {
@@ -13,8 +14,22 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [lastSync, setLastSync] = useState(null)
+  const [selectedStudent, setSelectedStudent] = useState(null)
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('dashboard-theme') || 'dark'
+  })
 
-  // Load attendance data from Firebase (real-time listener)
+  // Apply theme to HTML element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('dashboard-theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+  }
+
+  // Load attendance data from Firebase
   useEffect(() => {
     setConnectionStatus('connecting')
     const attendanceRef = ref(database, '/attendance')
@@ -23,7 +38,6 @@ function App() {
       try {
         const data = snapshot.val()
         if (data) {
-          // Convert Firebase nested structure to flat array
           const records = []
           Object.keys(data).forEach(date => {
             const dateRecords = data[date]
@@ -63,30 +77,24 @@ function App() {
       setLoading(false)
     })
 
-    // Cleanup listener on unmount
     return () => unsubscribe()
   }, [])
 
-  // Deduplicate attendance with cooldown logic
+  // Deduplicate with cooldown
   const deduplicatedData = useMemo(() => {
     const groups = {}
-
     attendanceData.forEach(record => {
       const key = `${record.rollNo}_${record.date}`
-      if (!groups[key]) {
-        groups[key] = []
-      }
+      if (!groups[key]) groups[key] = []
       groups[key].push(record)
     })
 
     const result = []
     Object.values(groups).forEach(records => {
       records.sort((a, b) => a.time.localeCompare(b.time))
-
       let lastValidTime = null
       records.forEach(record => {
         const recordTime = new Date(`${record.date}T${record.time}`)
-
         if (!lastValidTime) {
           result.push(record)
           lastValidTime = recordTime
@@ -99,11 +107,9 @@ function App() {
         }
       })
     })
-
     return result
   }, [attendanceData])
 
-  // Helper to format date as YYYY-MM-DD in local timezone
   const formatDateStr = (date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -111,13 +117,11 @@ function App() {
     return `${year}-${month}-${day}`
   }
 
-  // Filter by selected date
   const filteredByDate = useMemo(() => {
     const dateStr = formatDateStr(selectedDate)
     return deduplicatedData.filter(record => record.date === dateStr)
   }, [deduplicatedData, selectedDate])
 
-  // Filter by search term
   const filteredData = useMemo(() => {
     if (!searchTerm) return filteredByDate
     const term = searchTerm.toLowerCase()
@@ -127,22 +131,18 @@ function App() {
     )
   }, [filteredByDate, searchTerm])
 
-  // Get dates with attendance for calendar highlighting
   const datesWithAttendance = useMemo(() => {
     return new Set(deduplicatedData.map(r => r.date))
   }, [deduplicatedData])
 
-  // Get unique students count
   const uniqueStudents = useMemo(() => {
     return new Set(deduplicatedData.map(r => r.rollNo)).size
   }, [deduplicatedData])
 
-  // Stats
   const stats = useMemo(() => {
     const todayStr = formatDateStr(selectedDate)
     const todayRecords = deduplicatedData.filter(r => r.date === todayStr)
     const uniqueToday = new Set(todayRecords.map(r => r.rollNo)).size
-
     return {
       total: deduplicatedData.length,
       todayPresent: uniqueToday,
@@ -152,51 +152,36 @@ function App() {
     }
   }, [deduplicatedData, selectedDate, uniqueStudents])
 
-  // Calendar helpers
   const getDaysInMonth = (date) => {
     const year = date.getFullYear()
     const month = date.getMonth()
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDay = firstDay.getDay()
-    return { daysInMonth, startingDay }
+    return { daysInMonth: lastDay.getDate(), startingDay: firstDay.getDay() }
   }
 
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
     })
   }
 
   const prevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
   }
-
   const nextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
   }
-
   const selectDay = (day) => {
-    if (day) {
-      const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
-      setSelectedDate(newDate)
-    }
+    if (day) setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))
   }
 
   const { daysInMonth, startingDay } = getDaysInMonth(currentMonth)
   const today = new Date()
   const selectedDateStr = formatDateStr(selectedDate)
 
-  // Export functionality
   const exportCSV = () => {
-    if (deduplicatedData.length === 0) {
-      alert('No data to export')
-      return
-    }
+    if (deduplicatedData.length === 0) { alert('No data to export'); return }
     const headers = ['Name', 'Roll No', 'Year', 'Section', 'Date', 'Time', 'Status']
     const rows = deduplicatedData.map(r =>
       [r.name, r.rollNo, r.year, r.section, r.date, r.time, r.status]
@@ -211,13 +196,27 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
-  // Connection status indicator
   const statusConfig = {
     connecting: { color: '#f59e0b', text: 'Connecting...', icon: '⏳' },
     connected: { color: '#10b981', text: 'Live', icon: '🟢' },
     error: { color: '#ef4444', text: 'Offline', icon: '🔴' }
   }
   const status = statusConfig[connectionStatus]
+
+  // If a student is selected, show their profile
+  if (selectedStudent) {
+    return (
+      <>
+        <div className="bg-gradient" />
+        <StudentProfile
+          student={selectedStudent}
+          records={deduplicatedData}
+          onBack={() => setSelectedStudent(null)}
+          theme={theme}
+        />
+      </>
+    )
+  }
 
   return (
     <>
@@ -232,18 +231,11 @@ function App() {
               <p>Smart Attendance System • Firebase Connected</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div className="connection-status" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
-              borderRadius: '20px',
+          <div className="header-actions">
+            <div className="connection-badge" style={{
               background: `${status.color}15`,
-              border: `1px solid ${status.color}40`,
-              fontSize: '13px',
+              border: `1px solid ${status.color}30`,
               color: status.color,
-              fontWeight: 500
             }}>
               <span style={{ fontSize: '10px' }}>{status.icon}</span>
               {status.text}
@@ -253,11 +245,14 @@ function App() {
                 </span>
               )}
             </div>
+            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button className="btn btn-glass" onClick={() => window.location.reload()}>
-              🔄 Refresh
+              <RefreshCw size={14} /> Refresh
             </button>
             <button className="btn btn-primary" onClick={exportCSV}>
-              📥 Export
+              <Download size={14} /> Export
             </button>
           </div>
         </header>
@@ -314,8 +309,7 @@ function App() {
                 const day = i + 1
                 const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                 const isToday = currentMonth.getFullYear() === today.getFullYear() &&
-                  currentMonth.getMonth() === today.getMonth() &&
-                  day === today.getDate()
+                  currentMonth.getMonth() === today.getMonth() && day === today.getDate()
                 const isSelected = dateStr === selectedDateStr
                 const hasAttendance = datesWithAttendance.has(dateStr)
 
@@ -330,24 +324,12 @@ function App() {
                 )
               })}
             </div>
-            <p style={{ marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+            <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
               Green dots indicate days with attendance
             </p>
 
-            {/* Firebase info box */}
-            <div style={{
-              marginTop: '16px',
-              padding: '12px',
-              background: 'rgba(99, 102, 241, 0.1)',
-              borderRadius: '10px',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              fontSize: '12px',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.5
-            }}>
-              <div style={{ fontWeight: 600, color: 'var(--primary)', marginBottom: '4px' }}>
-                🔥 Firebase Live Data
-              </div>
+            <div className="calendar-info">
+              <div className="calendar-info-title">🔥 Firebase Live Data</div>
               {attendanceData.length} raw records loaded<br />
               {deduplicatedData.length} after dedup (90min cooldown)<br />
               {uniqueStudents} unique students tracked
@@ -379,7 +361,7 @@ function App() {
                   <div className="empty-state-icon">📭</div>
                   <h3>No Attendance Records</h3>
                   <p>No attendance found for {formatDate(selectedDate)}</p>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '6px' }}>
                     Try selecting a date with a green dot on the calendar
                   </p>
                 </div>
@@ -394,12 +376,13 @@ function App() {
                       <th>Section</th>
                       <th>Time</th>
                       <th>Status</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredData.map((record, index) => (
                       <tr key={`${record.rollNo}-${record.date}-${record.time}-${index}`}>
-                        <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{index + 1}</td>
+                        <td style={{ color: 'var(--text-tertiary)', fontSize: '12px' }}>{index + 1}</td>
                         <td className="student-name">{record.name}</td>
                         <td><span className="roll-no">{record.rollNo}</span></td>
                         <td>{record.year}</td>
@@ -409,6 +392,14 @@ function App() {
                           <span className={`status-badge ${record.status.toLowerCase()}`}>
                             ✓ {record.status}
                           </span>
+                        </td>
+                        <td>
+                          <button
+                            className="view-btn"
+                            onClick={() => setSelectedStudent(record)}
+                          >
+                            <Eye size={13} /> View
+                          </button>
                         </td>
                       </tr>
                     ))}
