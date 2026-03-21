@@ -6,6 +6,30 @@ import numpy as np
 import csv
 import time  # Added for capture delay
 
+# --- LCD DISPLAY SETUP ---
+LCD_ENABLED = True
+LCD_I2C_ADDRESS = 0x27
+LCD_COLS = 16
+LCD_ROWS = 2
+
+try:
+    from RPLCD.i2c import CharLCD
+    lcd = CharLCD('PCF8574', LCD_I2C_ADDRESS, cols=LCD_COLS, rows=LCD_ROWS)
+    lcd.clear()
+except Exception as e:
+    lcd = None
+    LCD_ENABLED = False
+
+def lcd_display(line1="", line2=""):
+    if not LCD_ENABLED or lcd is None: return
+    try:
+        lcd.clear()
+        lcd.cursor_pos = (0, 0)
+        lcd.write_string(line1[:LCD_COLS].center(LCD_COLS))
+        lcd.cursor_pos = (1, 0)
+        lcd.write_string(line2[:LCD_COLS].center(LCD_COLS))
+    except: pass
+
 # --- CONFIGURATION ---
 script_dir = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(script_dir, "dataset")
@@ -17,6 +41,7 @@ if not os.path.exists(DATASET_DIR):
 
 print("=== 🎓 NEW STUDENT REGISTRATION (VALIDATION MODE) ===")
 print("Please enter details strictly as requested.")
+lcd_display("NEW STUDENT", "Enter details")
 
 # --- INPUT VALIDATION LOOPS ---
 
@@ -94,11 +119,15 @@ if conflict:
     print(f"\n[ERROR] Roll Number {roll_no} is ALREADY REGISTERED to:")
     print(f"   -> {existing_owner}")
     print("Registration ABORTED to prevent duplicate IDs.")
+    lcd_display("ID CONFLICT!", "Aborted.")
+    time.sleep(3)
+    lcd_display("", "")
     exit()
 
 # 6. --- SECURITY CHECK 2: FACE DUPLICATION (ANTI-PROXY) ---
 if os.path.exists(ENCODINGS_FILE):
     print("\n[SECURITY] Scanning for Duplicate Faces... Look at the camera.")
+    lcd_display("SECURITY SCAN", "Look at camera")
     
     try:
         data = pickle.loads(open(ENCODINGS_FILE, "rb").read())
@@ -131,6 +160,9 @@ if os.path.exists(ENCODINGS_FILE):
                             
                             print("\n" + "!"*60)
                             print(f"[SECURITY ALERT] DUPLICATE FACE DETECTED!")
+                            lcd_display("DUPLICATE FACE", "Aborted.")
+                            time.sleep(3)
+                            lcd_display("", "")
                             print(f"This person is ALREADY registered as: {existing_person}")
                             print(f"Similarity Match: {min_dist:.2f}")
                             print("You cannot register the same person with a different name.")
@@ -155,6 +187,7 @@ count = 0
 last_capture_time = 0
 
 print("[INFO] Capturing 20 images... Please move your head slightly.")
+lcd_display("CAPTURING...", "Move head slowly")
 
 # --- WINDOW SETUP FOR REGISTRATION ---
 window_name = 'Registering Student'
@@ -196,6 +229,9 @@ while True:
 cam.release()
 cv2.destroyAllWindows()
 print(f"[SUCCESS] Registration Completed for {name} (Roll: {roll_no})")
+lcd_display("SUCCESS!", name[:LCD_COLS])
+time.sleep(3)
+lcd_display("SYSTEM READY", "")
 
 # 9. --- AUTO-SAVE TO STUDENTS DATABASE ---
 print(f"\n[INFO] Adding student to database...")
