@@ -76,9 +76,45 @@ def sync_brain_from_api():
         response = requests.get(f"{RENDER_API_URL}/sync_brain", timeout=120)
         
         if response.status_code == 200:
+            print("[INFO] Downloaded cloud encodings. Merging with local...")
+            
+            # 1. Load Cloud Data
+            try:
+                cloud_data = pickle.loads(response.content)
+            except Exception:
+                cloud_data = {"encodings": [], "names": []}
+            
+            # 2. Load Local Data
+            local_data = {"encodings": [], "names": []}
+            if os.path.exists(enc_path):
+                try:
+                    with open(enc_path, "rb") as f:
+                        local_data = pickle.loads(f.read())
+                except Exception:
+                    pass
+            
+            # 3. Overwrite local entries if the cloud has updated versions of the same person
+            cloud_names_set = set(cloud_data.get("names", []))
+            
+            merged_encodings = []
+            merged_names = []
+            
+            # Keep only local encodings where the person is NOT in the cloud
+            for l_enc, l_name in zip(local_data.get("encodings", []), local_data.get("names", [])):
+                if l_name not in cloud_names_set:
+                    merged_encodings.append(l_enc)
+                    merged_names.append(l_name)
+                    
+            # Append all cloud encodings (which will include the updated versions)
+            merged_encodings.extend(cloud_data.get("encodings", []))
+            merged_names.extend(cloud_data.get("names", []))
+                    
+            final_data = {"encodings": merged_encodings, "names": merged_names}
+            
+            # 4. Save merged data
             with open(enc_path, "wb") as f:
-                f.write(response.content)
-            print("[SUCCESS] Downloaded latest encodings from cloud!")
+                f.write(pickle.dumps(final_data))
+            print(f"[SUCCESS] Merged Cloud and Local brain! Total faces: {len(merged_names)}")
         else:
             print(f"[WARNING] Cloud Sync failed. Status: {response.status_code}. Using local brain.")
     except Exception as e:
@@ -302,7 +338,12 @@ def eye_aspect_ratio(eye_points):
     return ear
 
 # --- MAIN ENGINE (Pi 4 Optimized) ---
-cap = cv2.VideoCapture(0)
+# Use DirectShow on Windows to prevent MSMF errors
+import platform
+if platform.system() == "Windows":
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+else:
+    cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap.set(cv2.CAP_PROP_FPS, 30)  # Cap FPS for stability
@@ -425,6 +466,11 @@ while True:
 
         for i, (enc, loc) in enumerate(zip(encs, face_locations)):
             dists = face_recognition.face_distance(data["encodings"], enc)
+            
+            # Prevent crash if the database has zero enrolled faces
+            if len(dists) == 0:
+                continue
+                
             idx = np.argmin(dists)
             
             if dists[idx] < 0.5:
@@ -561,7 +607,10 @@ while True:
         lcd_state = "ready"
         frame_count = 0
         # Re-initialize camera
-        cap = cv2.VideoCapture(0)
+        if platform.system() == "Windows":
+            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        else:
+            cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         cap.set(cv2.CAP_PROP_FPS, 30)
