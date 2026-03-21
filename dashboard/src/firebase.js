@@ -2,7 +2,7 @@
 // Uses Firebase Realtime Database to fetch live attendance data
 
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, get } from 'firebase/database';
+import { getDatabase, ref, onValue, get, set, push } from 'firebase/database';
 
 // Firebase project config (attendance-system-2ad29)
 const firebaseConfig = {
@@ -19,4 +19,4 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-export { database, ref, onValue, get };
+export { database, ref, onValue, get, set, push };

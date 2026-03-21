@@ -7,6 +7,7 @@ import time
 import threading
 import csv
 import psutil
+import requests  # <-- ADDED FOR RENDER API
 from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, db
@@ -56,11 +57,38 @@ enc_path = os.path.join(script_dir, "encodings.pickle")
 key_path = os.path.join(script_dir, "serviceAccountKey.json")
 log_file = os.path.join(script_dir, "attendance_log.csv")
 
-# --- FIREBASE URL (hardcoded for Pi deployment) ---
+# --- FIREBASE & CLOUD BRAIN URLS ---
 FIREBASE_URL = "https://attendance-system-2ad29-default-rtdb.asia-southeast1.firebasedatabase.app"
+RENDER_API_URL = "https://attendance-cloud-brain.onrender.com"
 
-# --- FIREBASE INITIALIZATION ---
-if not os.path.exists(enc_path): exit("[ERROR] Encodings missing.")
+# --- CLOUD BRAIN SYNC FUNCTION ---
+def sync_brain_from_api():
+    print("[INFO] Checking Cloud Brain for latest AI models...")
+    if LCD_ENABLED and lcd:
+        lcd.clear()
+        lcd.cursor_pos = (0, 0)
+        lcd.write_string("SYNCING BRAIN...".center(LCD_COLS))
+        lcd.cursor_pos = (1, 0)
+        lcd.write_string("Please wait".center(LCD_COLS))
+        
+    try:
+        # 120 second timeout gives Render time to compile new faces if needed
+        response = requests.get(f"{RENDER_API_URL}/sync_brain", timeout=120)
+        
+        if response.status_code == 200:
+            with open(enc_path, "wb") as f:
+                f.write(response.content)
+            print("[SUCCESS] Downloaded latest encodings from cloud!")
+        else:
+            print(f"[WARNING] Cloud Sync failed. Status: {response.status_code}. Using local brain.")
+    except Exception as e:
+        print(f"[WARNING] Could not reach Cloud Brain: {e}. Using local brain.")
+
+# 1. DOWNLOAD LATEST BRAIN ON STARTUP
+sync_brain_from_api()
+
+# 2. LOAD BRAIN INTO MEMORY
+if not os.path.exists(enc_path): exit("[ERROR] Encodings missing and download failed.")
 data = pickle.loads(open(enc_path, "rb").read())
 
 # Initialize Firebase
@@ -502,7 +530,7 @@ while True:
             time.sleep(2)
         break
     
-    elif key == ord('r'):  # Reboot
+    elif key == ord('r'):  # Reboot & Sync Data
         if LCD_ENABLED and lcd:
             lcd.clear()
             lcd.cursor_pos = (0, 0)
@@ -513,6 +541,12 @@ while True:
         # Release resources before reboot
         cap.release()
         cv2.destroyAllWindows()
+        
+        # --- NEW: SYNC BRAIN ON REBOOT ---
+        sync_brain_from_api()
+        data = pickle.loads(open(enc_path, "rb").read())
+        # ---------------------------------
+        
         if LCD_ENABLED and lcd:
             lcd.clear()
             lcd.cursor_pos = (0, 0)

@@ -3,13 +3,14 @@ import { database, ref, onValue } from './firebase'
 import {
   Sun, Moon, Download, RefreshCw, Eye, Play, Pause, Plus, Minus,
   Zap, Radio, ShieldCheck, ShieldAlert, AlertTriangle, MessageCircle,
-  Send, Camera, Clock, Users, BarChart3, Activity
+  Send, Camera, Clock, Users, BarChart3, Activity, User
 } from 'lucide-react'
 import {
   LineChart, Line, ResponsiveContainer
 } from 'recharts'
 import StudentProfile from './StudentProfile'
 import HardwareTelemetry from './HardwareTelemetry'
+import EnrollNewStudent from './EnrollNewStudent'
 import './App.css'
 
 const COOLDOWN_MS = 90 * 60 * 1000
@@ -99,7 +100,8 @@ function App() {
                     section: record.section || '',
                     time: record.time || '',
                     date: record.date || date,
-                    status: record.status || 'Present'
+                    status: record.status || 'Present',
+                    profile_picture: record.profile_picture || null
                   })
                 }
               })
@@ -335,6 +337,7 @@ function App() {
             </div>
           </div>
           <div className="header-actions">
+            <EnrollNewStudent />
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
@@ -526,12 +529,46 @@ function App() {
                         <td style={{ color: 'var(--text-tertiary)' }}>{index + 1}</td>
                         <td>
                           <div className="name-cell">
+                            <div className="avatar-wrapper">
+                              {record.profile_picture ? (
+                                <img 
+                                  src={record.profile_picture} 
+                                  alt={record.name}
+                                  className="student-avatar"
+                                />
+                              ) : (
+                                <div className="avatar-fallback">
+                                  <User size={14} />
+                                </div>
+                              )}
+                            </div>
                             <span className="student-name">{record.name}</span>
                             <div className="snapshot-popover">
                               <div className="snapshot-img">
-                                <Camera size={20} />
+                                {record.profile_picture ? (
+                                  <img 
+                                    src={record.profile_picture} 
+                                    alt={record.name}
+                                    className="snapshot-image"
+                                  />
+                                ) : (
+                                  <Camera size={32} />
+                                )}
                               </div>
-                              <div className="snapshot-label">IoT Cam Snapshot • {record.timeIn}</div>
+                              <div className="snapshot-metrics">
+                                <div className="confidence-row">
+                                  <span className="metric-label">AI Match</span>
+                                  <div className="confidence-bar-bg">
+                                    <div className="confidence-bar-fill" style={{ width: `${record.confidence}%` }} />
+                                  </div>
+                                  <span className="confidence-value">{record.confidence}%</span>
+                                </div>
+                                <span className={`liveness-badge ${record.livenessPass ? 'verified' : 'unverified'}`}>
+                                  {record.livenessPass ? <ShieldCheck size={10} /> : <ShieldAlert size={10} />}
+                                  Liveness: {record.livenessPass ? 'Verified' : 'Pending'}
+                                </span>
+                              </div>
+                              <div className="snapshot-label">Captured at {record.timeIn}</div>
                             </div>
                           </div>
                         </td>
