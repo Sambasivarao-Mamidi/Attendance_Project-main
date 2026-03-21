@@ -95,6 +95,20 @@ while True:
         
     break
 
+# 4.5 Student Phone Validation
+while True:
+    student_phone = input("Enter Student Phone (10 digits): ").strip()
+    if len(student_phone) == 10 and student_phone.isdigit():
+        break
+    print("❌ Invalid Phone Number. Must be exactly 10 digits.")
+
+# 4.6 Parent Phone Validation 
+while True:
+    parent_phone = input("Enter Parent Phone (10 digits): ").strip()
+    if len(parent_phone) == 10 and parent_phone.isdigit():
+        break
+    print("❌ Invalid Phone Number. Must be exactly 10 digits.")
+
 # Construct folder name
 folder_name = f"{year}_{section}_{roll_no}_{name}"
 student_path = os.path.join(DATASET_DIR, folder_name)
@@ -254,13 +268,15 @@ try:
         with open(STUDENTS_DB, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             if write_headers:
-                writer.writerow(['RollNo', 'Name', 'Section'])
-            writer.writerow([roll_no, name, section])
+                writer.writerow(['RollNo', 'Name', 'Section', 'StudentPhone', 'ParentPhone'])
+            writer.writerow([roll_no, name, section, student_phone, parent_phone])
             
         print(f"✅ [SUCCESS] Student added to database:")
         print(f"   RollNo: {roll_no}")
         print(f"   Name: {name}")
         print(f"   Section: {section}")
+        print(f"   Student Phone: {student_phone}")
+        print(f"   Parent Phone: {parent_phone}")
     
 except Exception as e:
     print(f"❌ [ERROR] Failed to save to database: {e}")

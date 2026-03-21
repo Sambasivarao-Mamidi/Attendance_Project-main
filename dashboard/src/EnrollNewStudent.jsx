@@ -9,6 +9,8 @@ function EnrollNewStudent() {
   const [rollNumber, setRollNumber] = useState('')
   const [year, setYear] = useState('')
   const [section, setSection] = useState('')
+  const [studentPhone, setStudentPhone] = useState('')
+  const [parentPhone, setParentPhone] = useState('')
   const [isCapturing, setIsCapturing] = useState(false)
 
   useEffect(() => {
@@ -24,7 +26,7 @@ function EnrollNewStudent() {
 
   const handleStartCapture = async (e) => {
     e.preventDefault()
-    if (!fullName || !rollNumber || !year || !section) {
+    if (!fullName || !rollNumber || !year || !section || !studentPhone || !parentPhone) {
       alert('Please fill in all fields')
       return
     }
@@ -39,6 +41,8 @@ function EnrollNewStudent() {
         student_name: fullName,
         year: year,
         section: section,
+        student_phone: studentPhone,
+        parent_phone: parentPhone,
         status: 'pending',
         timestamp: Date.now()
       })
@@ -49,6 +53,8 @@ function EnrollNewStudent() {
       setRollNumber('')
       setYear('')
       setSection('')
+      setStudentPhone('')
+      setParentPhone('')
     } catch (error) {
       console.error('Error sending command to Firebase:', error)
       alert('Failed to start capture. Please try again.')
@@ -63,6 +69,8 @@ function EnrollNewStudent() {
     setRollNumber('')
     setYear('')
     setSection('')
+    setStudentPhone('')
+    setParentPhone('')
   }
 
   return (
@@ -154,6 +162,34 @@ function EnrollNewStudent() {
                       <option value="B">Section B</option>
                       <option value="C">Section C</option>
                     </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      📞 Student Phone
+                    </label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="10 digit number"
+                      maxLength={10}
+                      value={studentPhone}
+                      onChange={(e) => setStudentPhone(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      📞 Parent Phone
+                    </label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="10 digit number"
+                      maxLength={10}
+                      value={parentPhone}
+                      onChange={(e) => setParentPhone(e.target.value.replace(/\D/g, ''))}
+                    />
                   </div>
                 </div>
               </div>

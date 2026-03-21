@@ -1,9 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import { ArrowLeft, TrendingUp, Clock, UserCheck, UserX } from 'lucide-react'
+import { database } from './firebase'
+import { ref, set } from 'firebase/database'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -25,7 +27,30 @@ const BarTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function StudentProfile({ student, records, onBack, theme }) {
+export default function StudentProfile({ student, records, studentConfig, onBack, theme }) {
+  const [isEditingContact, setIsEditingContact] = useState(false)
+  const [studentPhone, setStudentPhone] = useState(studentConfig?.studentPhone || '')
+  const [parentPhone, setParentPhone] = useState(studentConfig?.parentPhone || '')
+
+  useEffect(() => {
+    setStudentPhone(studentConfig?.studentPhone || '')
+    setParentPhone(studentConfig?.parentPhone || '')
+  }, [studentConfig])
+
+  const handleSaveContact = async () => {
+    try {
+      await set(ref(database, `/students/${student.rollNo}`), {
+        ...studentConfig,
+        studentPhone: studentPhone,
+        parentPhone: parentPhone
+      })
+      setIsEditingContact(false)
+    } catch (e) {
+      alert("Failed to save contact info")
+      console.error(e)
+    }
+  }
+
   // Compute stats from real records
   const studentRecords = useMemo(() => {
     return records.filter(r =>
@@ -189,6 +214,49 @@ export default function StudentProfile({ student, records, onBack, theme }) {
             <span className="separator">|</span>
             <span>Section: {student.section || '—'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Contact Info Card */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>📞 Contact Information</span>
+          {!isEditingContact && (
+            <button className="btn btn-glass" onClick={() => setIsEditingContact(true)} style={{ padding: '4px 12px', fontSize: '12px' }}>Edit</button>
+          )}
+        </div>
+        <div className="card-body">
+          {isEditingContact ? (
+            <div className="contact-edit-form" style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Student Phone</label>
+                <input type="tel" className="form-input" value={studentPhone} onChange={e => setStudentPhone(e.target.value.replace(/\D/g, ''))} maxLength={10} placeholder="10 digits" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Parent Phone (WhatsApp)</label>
+                <input type="tel" className="form-input" value={parentPhone} onChange={e => setParentPhone(e.target.value.replace(/\D/g, ''))} maxLength={10} placeholder="10 digits" />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+                <button className="btn btn-primary" onClick={handleSaveContact} style={{ padding: '8px 16px' }}>Save</button>
+                <button className="btn btn-glass" onClick={() => {
+                  setStudentPhone(studentConfig?.studentPhone || '')
+                  setParentPhone(studentConfig?.parentPhone || '')
+                  setIsEditingContact(false)
+                }} style={{ padding: '8px 16px' }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="contact-display" style={{ display: 'flex', gap: '40px' }}>
+              <div>
+                <div className="stat-label">Student Phone</div>
+                <div style={{ fontWeight: '500', marginTop: '4px' }}>{studentConfig?.studentPhone || 'Not Set'}</div>
+              </div>
+              <div>
+                <div className="stat-label">Parent Phone (WhatsApp)</div>
+                <div style={{ fontWeight: '500', marginTop: '4px' }}>{studentConfig?.parentPhone || 'Not Set'}</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

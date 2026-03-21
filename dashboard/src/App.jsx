@@ -17,6 +17,7 @@ const COOLDOWN_MS = 90 * 60 * 1000
 
 function App() {
   const [attendanceData, setAttendanceData] = useState([])
+  const [studentsData, setStudentsData] = useState({})
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
@@ -125,6 +126,19 @@ function App() {
       console.error('Firebase listener error:', error)
       setConnectionStatus('error')
       setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Firebase Students Data
+  useEffect(() => {
+    const studentsRef = ref(database, '/students')
+    const unsubscribe = onValue(studentsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setStudentsData(snapshot.val())
+      } else {
+        setStudentsData({})
+      }
     })
     return () => unsubscribe()
   }, [])
@@ -300,24 +314,33 @@ function App() {
     setOverrides(prev => ({ ...prev, [rollNo]: true }))
   }
 
-  const sendWhatsApp = (name, pct) => {
+  const sendWhatsApp = (name, pct, rollNo) => {
+    let targetPhone = "916309528076"
+    if (rollNo && studentsData && studentsData[rollNo]?.parentPhone) {
+      targetPhone = "91" + studentsData[rollNo].parentPhone
+    }
     const msg = encodeURIComponent(`⚠️ Attendance Alert: ${name} has only ${pct}% attendance this month. Please ensure regular attendance. — Smart Attendance System`)
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
+    window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank')
   }
 
   const sendAllAlerts = () => {
     const msg = encodeURIComponent(`⚠️ Attendance Alert: The following students are below the ${threshold}% threshold:\n${defaulters.map(d => `• ${d.name}: ${d.attendance}%`).join('\n')}\n\nPlease ensure regular attendance. — Smart Attendance System`)
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
+    window.open(`https://wa.me/916309528076?text=${msg}`, '_blank')
   }
 
   const isOnline = connectionStatus === 'connected'
 
-  // If student selected, show profile
   if (selectedStudent) {
     return (
       <>
         <div className="bg-gradient" />
-        <StudentProfile student={selectedStudent} records={deduplicatedData} onBack={() => setSelectedStudent(null)} theme={theme} />
+        <StudentProfile 
+          student={selectedStudent} 
+          records={deduplicatedData} 
+          studentConfig={studentsData[selectedStudent.rollNo] || {}}
+          onBack={() => setSelectedStudent(null)} 
+          theme={theme} 
+        />
       </>
     )
   }
@@ -664,7 +687,7 @@ function App() {
                       <td><span className={`section-badge ${d.section}`}>{d.section}</span></td>
                       <td><span className="defaulter-pct">{d.attendance}%</span></td>
                       <td>
-                        <button className="btn-whatsapp" onClick={() => sendWhatsApp(d.name, d.attendance)}>
+                        <button className="btn-whatsapp" onClick={() => sendWhatsApp(d.name, d.attendance, d.rollNo)}>
                           <MessageCircle size={12} /> WhatsApp
                         </button>
                       </td>
