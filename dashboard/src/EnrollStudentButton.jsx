@@ -11,22 +11,37 @@ export default function EnrollStudentButton() {
   // The Trigger: Handle the button click and write to Firebase
   const handleEnroll = async (e) => {
     e.preventDefault();
-    if (!studentName.trim()) return;
+    console.log("🚨 Step 1: Button was physically clicked!");
+    
+    if (!studentName.trim()) {
+      console.log("⚠️ Student name is empty, ignoring click.");
+      return;
+    }
 
     setIsProcessing(true);
     setSuccessMessage('');
 
     try {
       const commandsRef = ref(database, 'SystemCommands');
-      await set(commandsRef, {
+      console.log("🚨 Step 2: Attempting to send data to Firebase...");
+      
+      set(commandsRef, {
         mode: 'enroll',
         target_name: studentName.trim(),
         status: 'pending'
+      })
+      .then(() => {
+        console.log("✅ Step 3: SUCCESS! Firebase received the data.");
+      })
+      .catch((error) => {
+        console.error("❌ Step 3: FIREBASE REJECTED IT. Error details: ", error);
+        setIsProcessing(false);
+        alert('Failed to trigger IoT device. Check your connection.');
       });
-    } catch (error) {
-      console.error('Error triggering enrollment:', error);
+      
+    } catch (err) {
+      console.error("❌ Step 2: React crashed before it could even talk to Firebase: ", err);
       setIsProcessing(false);
-      alert('Failed to trigger IoT device. Check your connection.');
     }
   };
 
@@ -62,7 +77,7 @@ export default function EnrollStudentButton() {
     <div className="max-w-md mx-auto p-6 bg-white rounded-xl shadow-md space-y-4">
       <h2 className="text-xl font-bold text-slate-800">Remote Face Enrollment</h2>
       
-      <form onSubmit={handleEnroll} className="flex flex-col gap-4">
+      <form className="flex flex-col gap-4">
         {/* The UI: Input Field */}
         <div className="flex flex-col gap-1">
           <label htmlFor="studentName" className="text-sm font-medium text-slate-600">
@@ -82,8 +97,9 @@ export default function EnrollStudentButton() {
 
         {/* The UI & Loading State: Enroll Button */}
         <button
-          type="submit"
-          disabled={!studentName.trim() || isProcessing}
+          type="button"
+          onClick={handleEnroll}
+          disabled={isProcessing}
           className="relative flex justify-center items-center w-full px-4 py-2 text-white font-medium bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-75 disabled:cursor-not-allowed transition-all"
         >
           {isProcessing ? (

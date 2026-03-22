@@ -34,16 +34,21 @@ function EnrollNewStudent() {
     setIsCapturing(true)
 
     try {
-      const commandRef = ref(database, 'Commands/Pi4')
+      const commandRef = ref(database, 'SystemCommands')
+      
+      // The Pi expects the format: Year_Section_RollNo_Name
+      const formatTargetName = `${year}_${section}_${rollNumber}_${fullName}`;
+      
       await set(commandRef, {
-        action: 'START_ENROLL',
+        mode: 'enroll',
+        target_name: formatTargetName,
+        status: 'pending',
         student_id: rollNumber,
         student_name: fullName,
         year: year,
         section: section,
         student_phone: studentPhone,
         parent_phone: parentPhone,
-        status: 'pending',
         timestamp: Date.now()
       })
       
