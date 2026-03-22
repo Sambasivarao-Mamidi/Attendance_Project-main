@@ -6,6 +6,11 @@ import pickle
 import numpy as np
 import csv
 import time  # Added for capture delay
+import firebase_admin
+from firebase_admin import credentials, db
+from dotenv import load_dotenv
+import cloudinary
+import cloudinary.uploader
 
 # --- LCD DISPLAY SETUP ---
 LCD_ENABLED = True
@@ -39,6 +44,30 @@ STUDENTS_DB = os.path.join(script_dir, "students_db.csv")
 
 if not os.path.exists(DATASET_DIR):
     os.makedirs(DATASET_DIR)
+
+# --- INITIALIZE ENVIRONMENT AND FIREBASE ---
+load_dotenv(os.path.join(script_dir, '.env'))
+
+FIREBASE_URL = os.environ.get("FIREBASE_URL")
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate(os.path.join(script_dir, "serviceAccountKey.json"))
+        firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_URL})
+        print("[INFO] Firebase Initialized successfully in capture script.")
+    except Exception as e:
+        print(f"[WARNING] Firebase init failed in capture: {e}")
+
+# --- INITIALIZE CLOUDINARY ---
+try:
+    cloudinary.config(
+        cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.environ.get("CLOUDINARY_API_KEY"),
+        api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+        secure=True
+    )
+    print("[INFO] Cloudinary Configurations Loaded.")
+except Exception as e:
+    print(f"[WARNING] Cloudinary init failed: {e}")
 
 print("=== 🎓 NEW STUDENT REGISTRATION (VALIDATION MODE) ===")
 print("Please enter details strictly as requested.")
@@ -273,7 +302,39 @@ lcd_display("SUCCESS!", name[:LCD_COLS])
 time.sleep(3)
 lcd_display("SYSTEM READY", "")
 
-# 9. --- AUTO-SAVE TO STUDENTS DATABASE ---
+# 9. --- CLOUDINARY UPLOAD BATCH ---
+if count > 0:
+    print("\n[INFO] Uploading 20 images to Cloudinary. Please wait...")
+    lcd_display("UPLOADING...", "To Cloudinary")
+    
+    training_urls = []
+    public_ids = []
+    
+    try:
+        for i in range(1, count + 1):
+            img_path = os.path.join(student_path, f"{name}_{i}.jpg")
+            if os.path.exists(img_path):
+                resp = cloudinary.uploader.upload(img_path, folder=f"attendance_system/{roll_no}")
+                training_urls.append(resp['secure_url'])
+                public_ids.append(resp['public_id'])
+                print(f"  -> Uploaded {i}/{count}")
+        
+        if training_urls:
+            print("[SUCCESS] All images uploaded! Saving URLs to Firebase...")
+            db.reference(f'Students/{roll_no}').update({
+                'name': name,
+                'year': year,
+                'section': section,
+                'training_images': training_urls,
+                'cloudinary_public_ids': public_ids
+            })
+            print(f"[SUCCESS] URLs pushed to Firebase under Students/{roll_no}")
+            lcd_display("CLOUD SYNC", "Complete!")
+            time.sleep(2)
+    except Exception as e:
+        print(f"❌ [ERROR] Cloudinary Upload Failed: {e}")
+
+# 10. --- AUTO-SAVE TO STUDENTS DATABASE ---
 print(f"\n[INFO] Adding student to database...")
 try:
     student_exists = False

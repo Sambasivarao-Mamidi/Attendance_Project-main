@@ -16,6 +16,9 @@ from firebase_admin import credentials, db
 from scipy.spatial import distance as dist
 from threading import Thread
 from queue import Queue
+from dotenv import load_dotenv
+import cloudinary
+import cloudinary.uploader
 
 # --- LCD DISPLAY SETUP ---
 LCD_ENABLED = True
@@ -60,8 +63,21 @@ key_path = os.path.join(script_dir, "serviceAccountKey.json")
 log_file = os.path.join(script_dir, "attendance_log.csv")
 
 # --- FIREBASE & CLOUD BRAIN URLS ---
-FIREBASE_URL = "https://attendance-system-2ad29-default-rtdb.asia-southeast1.firebasedatabase.app"
+load_dotenv(os.path.join(script_dir, '.env'))
+FIREBASE_URL = os.environ.get("FIREBASE_URL") or "https://attendance-system-2ad29-default-rtdb.asia-southeast1.firebasedatabase.app"
 RENDER_API_URL = "https://attendance-cloud-brain.onrender.com"
+
+# --- INITIALIZE CLOUDINARY ---
+try:
+    cloudinary.config(
+        cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.environ.get("CLOUDINARY_API_KEY"),
+        api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+        secure=True
+    )
+    print("[INFO] Cloudinary Configurations Loaded.")
+except Exception as e:
+    print(f"[WARNING] Cloudinary init failed: {e}")
 
 # --- CLOUD BRAIN SYNC FUNCTION ---
 def sync_brain_from_api():
@@ -481,6 +497,27 @@ while True:
         # 4. Download the newly trained Brain from Render!
         sync_brain_from_api()
         data = pickle.loads(open(enc_path, "rb").read()) # Reload new brain into memory
+        
+        # 4.5 Auto-Cleanup Cloudinary Images (Option 1 Security)
+        cleanup_roll_no = enroll_target_name
+        if "_" in cleanup_roll_no:
+            parts = cleanup_roll_no.split("_")
+            if len(parts) >= 3:
+                cleanup_roll_no = parts[2]
+                
+        print(f"[CLEANUP] Removing Cloudinary images for {cleanup_roll_no}...")
+        try:
+            student_ref = db.reference(f'Students/{cleanup_roll_no}')
+            student_data = student_ref.get()
+            if student_data and 'cloudinary_public_ids' in student_data:
+                for pub_id in student_data['cloudinary_public_ids']:
+                    cloudinary.uploader.destroy(pub_id)
+                # Remove URLs from Firebase to keep it completely clean
+                student_ref.child('training_images').delete()
+                student_ref.child('cloudinary_public_ids').delete()
+                print("[CLEANUP] Successfully auto-deleted raw images from Cloudinary & Firebase!")
+        except Exception as e:
+            print(f"[CLEANUP ERROR] Failed to delete images: {e}")
         
         # 5. Turn the camera back on and resume attendance
         print("[SYSTEM] Enrollment complete. Resuming attendance...")
