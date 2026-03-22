@@ -1,4 +1,8 @@
 # Smart IoT Cloud-Integrated Attendance System
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![React](https://img.shields.io/badge/React-Vite-61DAFB.svg?logo=react)](https://reactjs.org/)
+[![Firebase](https://img.shields.io/badge/Firebase-Realtime%20Database-FFCA28.svg?logo=firebase)](https://firebase.google.com/)
 
 Welcome to the **Smart IoT Attendance System**, an advanced, edge-to-cloud face-recognition ecosystem designed specifically for Raspberry Pi hardware. This project transforms a standard Python face recognition script into a robust IoT architecture capable of liveness detection, live hardware telemetry, cloud synchronization, and remote bi-directional control.
 
@@ -53,6 +57,8 @@ Because Edge devices often run without a keyboard or mouse ("headless"), we use 
 ### 1. Pre-Requisites
 Ensure you possess your Firebase `serviceAccountKey.json` authentication token and have placed it neatly inside the `/data_set/` folder.
 
+> ⚠️ **SECURITY WARNING:** `serviceAccountKey.json` gives full admin access to your Firebase project. **NEVER** commit or upload this file to GitHub or any public space. It is already included in `.gitignore` by default.
+
 ### 2. Edge Device Setup
 Navigate to your edge device folder and install the required machine learning and system libraries:
 ```bash
@@ -74,5 +80,8 @@ cd dashboard
 npm install
 npm run dev
 ```
+
+### 4. Firebase Security Rules (Important for Production)
+Because the React frontend connects to Firebase using public configuration data (`firebase.js`), you must secure your Firebase Realtime Database with robust **Security Rules** to ensure that unauthorized users cannot maliciously write or delete data.
 
 The system is now fully live! Step in front of the camera, blink to register, and observe your real-time data seamlessly populating on the dashboard.

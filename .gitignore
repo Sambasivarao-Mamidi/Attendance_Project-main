@@ -39,5 +39,12 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# ===== Frontend Secrets =====
+# ===== Frontend / Env Secrets =====
+.env
+.env.*
+!.env.example
+dashboard/.env
+dashboard/.env.local
 Web_Dashboard/config.js
+dashboard/src/config.js
+# NOTE: dashboard/src/firebase.js contains public config, but if it has sensitive keys, consider ignoring it or using env vars!
