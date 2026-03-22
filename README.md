@@ -42,6 +42,7 @@ Because Edge devices often run without a keyboard or mouse ("headless"), we use 
 - `attendance_log.csv` & `students_db.csv`: Failsafe local memory. If the internet drops, these CSVs ensure data is securely stored offline.
 
 ### Dashboard Files (`/dashboard/`)
+- `src/EnrollStudentButton.jsx`: A specialized remote-control React component that handles the UI and logic for triggering edge device enrollment over Firebase, complete with real-time loading and success states.
 - `src/StudentProfile.jsx`: A heavily configured React UI component serving dynamic charts, analytical data calculations (monthly/weekly breakdowns), and the logic specifically tied to firing the remote face enrollment triggers to Firebase.
 - `src/firebase.js`: Initializes your Realtime Database hookups for the web client.
 
