@@ -37,6 +37,20 @@ export default function StudentProfile({ student, records, studentConfig, onBack
     setParentPhone(studentConfig?.parentPhone || '')
   }, [studentConfig])
 
+  const triggerEnrollment = () => {
+    const targetName = `${student.year || '0'}_${student.section || 'X'}_${student.rollNo}_${student.name}`
+    set(ref(database, 'SystemCommands'), {
+      mode: "enroll",
+      target_name: targetName,
+      status: "pending"
+    }).then(() => {
+      alert("Enrollment triggered! The camera on the IoT Edge device will now transition to capture photos.")
+    }).catch((e) => {
+      console.error(e)
+      alert("Failed to trigger enrollment.")
+    })
+  }
+
   const handleSaveContact = async () => {
     try {
       await set(ref(database, `/students/${student.rollNo}`), {
@@ -205,14 +219,21 @@ export default function StudentProfile({ student, records, studentConfig, onBack
       {/* Profile Header */}
       <div className="profile-header">
         <div className="profile-avatar">{initials}</div>
-        <div className="profile-info">
-          <h1>{student.name}</h1>
-          <div className="profile-subtitle">
-            <span>Roll: {student.rollNo}</span>
-            <span className="separator">|</span>
-            <span>Year: {student.year || '—'}</span>
-            <span className="separator">|</span>
-            <span>Section: {student.section || '—'}</span>
+        <div className="profile-info" style={{ width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h1>{student.name}</h1>
+              <div className="profile-subtitle" style={{ marginTop: '8px' }}>
+                <span>Roll: {student.rollNo}</span>
+                <span className="separator">|</span>
+                <span>Year: {student.year || '—'}</span>
+                <span className="separator">|</span>
+                <span>Section: {student.section || '—'}</span>
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={triggerEnrollment} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px' }}>
+              <UserCheck size={16} /> Enroll Face / Retrain
+            </button>
           </div>
         </div>
       </div>

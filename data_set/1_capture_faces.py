@@ -1,3 +1,4 @@
+import sys
 import cv2
 import os
 import face_recognition
@@ -45,70 +46,95 @@ lcd_display("NEW STUDENT", "Enter details")
 
 # --- INPUT VALIDATION LOOPS ---
 
-# 1. Year Validation (1-4 only)
-while True:
-    year = input("Enter Year (1, 2, 3, 4): ").strip()
-    if year in ['1', '2', '3', '4']:
-        break
-    print("❌ Invalid Year. Please enter a number between 1 and 4.")
+# If the master script hands us a name, use it. Otherwise, use keyboard input.
+if len(sys.argv) > 1:
+    raw_arg = sys.argv[1]
+    if "_" in raw_arg:
+        parts = raw_arg.split("_")
+        if len(parts) >= 4:
+            year = parts[0]
+            section = parts[1]
+            roll_no = parts[2]
+            name = "_".join(parts[3:]).upper()
+        else:
+            year = "0"
+            section = "X"
+            roll_no = "UNKNOWN"
+            name = raw_arg.upper()
+    else:
+        year = "0"
+        section = "X"
+        roll_no = "UNKNOWN"
+        name = raw_arg.upper()
+    student_phone = "0000000000"
+    parent_phone = "0000000000"
+    print(f"[AUTO-MODE] Enrolling from Dashboard: {name} (Roll: {roll_no})")
+else:
+    # 1. Year Validation (1-4 only)
+    while True:
+        year = input("Enter Year (1, 2, 3, 4): ").strip()
+        if year in ['1', '2', '3', '4']:
+            break
+        print("❌ Invalid Year. Please enter a number between 1 and 4.")
 
-# 2. Section Validation (A or B only)
-while True:
-    section = input("Enter Section (A/B): ").strip().upper()
-    if section in ['A', 'B']:
-        break
-    print("❌ Invalid Section. Only 'A' or 'B' allowed.")
+    # 2. Section Validation (A or B only)
+    while True:
+        section = input("Enter Section (A/B): ").strip().upper()
+        if section in ['A', 'B']:
+            break
+        print("❌ Invalid Section. Only 'A' or 'B' allowed.")
 
-# 3. Roll Number Validation (10 chars, must have numbers)
-while True:
-    roll_no = input("Enter Roll No (e.g., 22NR1A0462): ").strip().upper()
+    # 3. Roll Number Validation (10 chars, must have numbers)
+    while True:
+        roll_no = input("Enter Roll No (e.g., 22NR1A0462): ").strip().upper()
     
-    if len(roll_no) != 10:
-        print(f"❌ Invalid Length. Roll No must be exactly 10 characters (You entered {len(roll_no)}).")
-        continue
+        if len(roll_no) != 10:
+            print(f"❌ Invalid Length. Roll No must be exactly 10 characters (You entered {len(roll_no)}).")
+            continue
         
-    if not roll_no.isalnum():
-        print("❌ Invalid Format. Roll No should only contain Letters and Numbers.")
-        continue
+        if not roll_no.isalnum():
+            print("❌ Invalid Format. Roll No should only contain Letters and Numbers.")
+            continue
         
-    if not any(char.isdigit() for char in roll_no):
-        print("❌ Error: Roll No must contain numbers. Did you type a Name by mistake?")
-        continue
+        if not any(char.isdigit() for char in roll_no):
+            print("❌ Error: Roll No must contain numbers. Did you type a Name by mistake?")
+            continue
         
-    break
+        break
 
-# 4. Name Validation (Letters only, no numbers)
-while True:
-    name = input("Enter Name: ").strip().upper() 
+    # 4. Name Validation (Letters only, no numbers)
+    while True:
+        name = input("Enter Name: ").strip().upper() 
     
-    if len(name) < 3:
-        print("❌ Name too short.")
-        continue
+        if len(name) < 3:
+            print("❌ Name too short.")
+            continue
         
-    if any(char.isdigit() for char in name):
-        print("❌ Error: Name cannot contain numbers. Did you type Roll No by mistake?")
-        continue
+        if any(char.isdigit() for char in name):
+            print("❌ Error: Name cannot contain numbers. Did you type Roll No by mistake?")
+            continue
         
-    if not all(x.isalpha() or x.isspace() for x in name):
-        print("❌ Error: Name should only contain letters.")
-        continue
+        if not all(x.isalpha() or x.isspace() for x in name):
+            print("❌ Error: Name should only contain letters.")
+            continue
         
-    break
-
-# 4.5 Student Phone Validation
-while True:
-    student_phone = input("Enter Student Phone (10 digits): ").strip()
-    if len(student_phone) == 10 and student_phone.isdigit():
         break
-    print("❌ Invalid Phone Number. Must be exactly 10 digits.")
 
-# 4.6 Parent Phone Validation 
-while True:
-    parent_phone = input("Enter Parent Phone (10 digits): ").strip()
-    if len(parent_phone) == 10 and parent_phone.isdigit():
-        break
-    print("❌ Invalid Phone Number. Must be exactly 10 digits.")
+    # 4.5 Student Phone Validation
+    while True:
+        student_phone = input("Enter Student Phone (10 digits): ").strip()
+        if len(student_phone) == 10 and student_phone.isdigit():
+            break
+        print("❌ Invalid Phone Number. Must be exactly 10 digits.")
 
+    # 4.6 Parent Phone Validation 
+    while True:
+        parent_phone = input("Enter Parent Phone (10 digits): ").strip()
+        if len(parent_phone) == 10 and parent_phone.isdigit():
+            break
+        print("❌ Invalid Phone Number. Must be exactly 10 digits.")
+
+    
 # Construct folder name
 folder_name = f"{year}_{section}_{roll_no}_{name}"
 student_path = os.path.join(DATASET_DIR, folder_name)
