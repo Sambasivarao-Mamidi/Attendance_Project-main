@@ -450,7 +450,6 @@ print("[INFO] Starting Firebase Command Listener...")
 db.reference('/SystemCommands').listen(system_command_handler)
 
 while True:
-    global system_mode, enroll_target_name
     
     # --- ENROLLMENT INTERCEPTOR ---
     if system_mode == "enroll":
