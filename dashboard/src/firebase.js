@@ -6,13 +6,13 @@ import { getDatabase, ref, onValue, get, set, push } from 'firebase/database';
 
 // Firebase project config (attendance-system-2ad29)
 const firebaseConfig = {
-    apiKey: "AIzaSyDummyKeyForRTDB", // RTDB doesn't need a real API key for public reads
-    authDomain: "attendance-system-2ad29.firebaseapp.com",
-    databaseURL: "https://attendance-system-2ad29-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "attendance-system-2ad29",
-    storageBucket: "attendance-system-2ad29.appspot.com",
-    messagingSenderId: "000000000000",
-    appId: "1:000000000000:web:0000000000000000000000"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
