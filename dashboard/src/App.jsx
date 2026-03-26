@@ -11,6 +11,7 @@ import {
 import StudentProfile from './StudentProfile'
 import HardwareTelemetry from './HardwareTelemetry'
 import EnrollNewStudent from './EnrollNewStudent'
+import ActiveStudentsPanel from './ActiveStudentsPanel'
 import './App.css'
 
 const COOLDOWN_MS = 90 * 60 * 1000
@@ -25,6 +26,7 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [lastSync, setLastSync] = useState(null)
   const [selectedStudent, setSelectedStudent] = useState(null)
+  const [isStudentsPanelOpen, setIsStudentsPanelOpen] = useState(false)
   const [overrides, setOverrides] = useState({})
   const [threshold, setThreshold] = useState(60)
 
@@ -230,6 +232,23 @@ function App() {
       avgConfidence: avgConf
     }
   }, [deduplicatedData, selectedDate, uniqueStudents, tableData])
+
+  // All unique students for the panel
+  const allStudents = useMemo(() => {
+    const studentMap = {}
+    deduplicatedData.forEach(record => {
+      if (!studentMap[record.rollNo]) {
+        studentMap[record.rollNo] = {
+          name: record.name,
+          rollNo: record.rollNo,
+          year: record.year,
+          section: record.section,
+          profile_picture: record.profile_picture
+        }
+      }
+    })
+    return Object.values(studentMap)
+  }, [deduplicatedData])
 
   // Sparkline data: last 7 unique dates
   const sparklineData = useMemo(() => {
@@ -447,7 +466,7 @@ function App() {
             </div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card clickable" onClick={() => setIsStudentsPanelOpen(true)}>
             <div className="stat-card-top">
               <div className="stat-content">
                 <div className="stat-value">{stats.totalStudents}</div>
@@ -706,6 +725,18 @@ function App() {
 
         {/* ===== HARDWARE TELEMETRY ===== */}
         <HardwareTelemetry theme={theme} />
+
+        {/* ===== ACTIVE STUDENTS PANEL ===== */}
+        <ActiveStudentsPanel
+          isOpen={isStudentsPanelOpen}
+          onClose={() => setIsStudentsPanelOpen(false)}
+          students={allStudents}
+          studentsConfig={studentsData}
+          onViewStudent={(student) => {
+            setIsStudentsPanelOpen(false)
+            setTimeout(() => setSelectedStudent(student), 300)
+          }}
+        />
       </div>
     </>
   )

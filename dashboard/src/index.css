@@ -1340,3 +1340,360 @@ td { font-size: 12px; color: var(--text-primary); }
     grid-column: span 1;
   }
 }
+
+/* ===== ACTIVE STUDENTS SIDE PANEL ===== */
+.students-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  animation: overlayFadeIn 0.3s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.students-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100%;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.students-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-control);
+}
+
+.students-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.students-panel-title svg {
+  color: var(--blue);
+}
+
+.students-count {
+  background: var(--blue-bg);
+  color: var(--blue);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.students-panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.students-panel-close:hover {
+  background: var(--rose-bg);
+  color: var(--rose);
+}
+
+.students-panel-search {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-input-wrapper {
+  position: relative;
+}
+
+.search-input-wrapper .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+}
+
+.students-search-input {
+  width: 100%;
+  padding: 10px 12px 10px 38px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.students-search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-bg);
+}
+
+.students-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.students-panel-filters {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-group svg {
+  color: var(--text-tertiary);
+}
+
+.filter-select {
+  padding: 6px 28px 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: all 0.2s ease;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.students-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.students-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.students-empty svg {
+  opacity: 0.3;
+  margin-bottom: 12px;
+}
+
+.students-empty p {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.students-empty span {
+  font-size: 12px;
+}
+
+.student-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.student-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  transform: translateX(-4px);
+}
+
+.student-card:last-child {
+  margin-bottom: 0;
+}
+
+.student-card-avatar {
+  flex-shrink: 0;
+}
+
+.student-card-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+}
+
+.student-card-initials {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--pink) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+
+.student-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.student-card-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.detail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.detail-item svg {
+  color: var(--text-tertiary);
+}
+
+.student-card-phone {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.student-card-phone svg {
+  color: var(--emerald);
+}
+
+.student-card-arrow {
+  font-size: 18px;
+  color: var(--text-tertiary);
+  transition: all 0.2s ease;
+}
+
+.student-card:hover .student-card-arrow {
+  color: var(--primary);
+  transform: translateX(4px);
+}
+
+.students-panel-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
+  background: var(--bg-control);
+}
+
+/* Stat card clickable state */
+.stat-card.clickable {
+  cursor: pointer;
+}
+
+.stat-card.clickable:hover .stat-icon.blue {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
+}
+
+.stat-card.clickable:hover .stat-icon.blue svg {
+  animation: bounceIcon 0.4s ease;
+}
+
+@keyframes bounceIcon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+/* Responsive styles for the panel */
+@media (max-width: 500px) {
+  .students-panel {
+    width: 100%;
+  }
+  
+  .students-panel-filters {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .filter-select {
+    flex: 1;
+  }
+  
+  .student-card-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
