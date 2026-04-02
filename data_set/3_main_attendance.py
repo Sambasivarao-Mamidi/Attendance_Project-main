@@ -488,15 +488,34 @@ while True:
         # Use sys.executable to ensure we use the correct Python executable on Windows or Pi
         subprocess.run([sys.executable, capture_script_path, enroll_target_name])
         
+        # 2.5 CRITICAL: Re-encode ALL faces locally so new student is recognized immediately
+        print("[SYSTEM] Rebuilding face encodings locally...")
+        if LCD_ENABLED and lcd:
+            lcd.clear()
+            lcd.cursor_pos = (0, 0)
+            lcd.write_string("ENCODING...".center(LCD_COLS))
+            lcd.cursor_pos = (1, 0)
+            lcd.write_string("Please wait".center(LCD_COLS))
+        encode_script_path = os.path.join(script_dir, "2_encode_faces.py")
+        encode_result = subprocess.run([sys.executable, encode_script_path])
+        if encode_result.returncode == 0:
+            print("[SUCCESS] Local face encodings rebuilt!")
+        else:
+            print("[WARNING] Local encoding failed, will try cloud sync...")
+        
         # 3. Tell Firebase the enrollment is done
         db.reference('/SystemCommands').update({
             'mode': 'attendance',
             'status': 'completed'
         })
         
-        # 4. Download the newly trained Brain from Render!
-        sync_brain_from_api()
+        # 4. Try cloud sync as a bonus (won't break anything if it fails)
+        try:
+            sync_brain_from_api()
+        except Exception as e:
+            print(f"[WARNING] Cloud sync failed (not critical, local brain is ready): {e}")
         data = pickle.loads(open(enc_path, "rb").read()) # Reload new brain into memory
+        print(f"[INFO] Brain reloaded! Total faces in memory: {len(data['names'])}")
         
         # 4.5 Auto-Cleanup Cloudinary Images (Option 1 Security)
         cleanup_roll_no = enroll_target_name
